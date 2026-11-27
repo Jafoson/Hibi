@@ -1,0 +1,10 @@
+name: Beta image
+on:
+  workflow_dispatch:
+jobs:
+  image:
+    name: Build image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        run: echo "docker build -t ghcr.io/jafoson/hibi:beta ."; sleep 5; echo "pushed ghcr.io/jafoson/hibi:beta"

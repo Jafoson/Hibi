@@ -1,0 +1,153 @@
+name: Barynt demo deploy
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        type: choice
+        options: [approval, failure, monorepo, regions, previews]
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          echo "bun install v1.3.0"
+          sleep 4
+          echo "412 packages installed [2.31s]"
+      - name: Build
+        run: |
+          echo "next build"
+          sleep 6
+          echo "✓ Compiled successfully"
+  e2e:
+    name: e2e (${{ matrix.browser }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome, firefox, safari]
+    steps:
+      - name: Run e2e
+        run: |
+          echo "playwright test --project=${{ matrix.browser }}"
+          sleep 5
+          echo "24 passed (31s)"
+
+  # Freigabe: staging, then production waits for a reviewer.
+  approval-staging:
+    name: deploy / staging
+    if: inputs.scenario == 'approval'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.hibi.example.com
+    steps:
+      - name: Deploy
+        run: echo "Deploying to staging"; sleep 5; echo "Done"
+  approval-production:
+    name: deploy / production
+    if: inputs.scenario == 'approval'
+    needs: approval-staging
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://hibi.example.com
+    steps:
+      - name: Migrate
+        run: echo "12 migrations applied"; sleep 3
+      - name: Rollout
+        run: echo "Rolling out"; sleep 5; echo "deployment web successfully rolled out"
+
+  # Fehler: the migration fails on staging.
+  failure-staging:
+    name: deploy / migrate-db
+    if: inputs.scenario == 'failure'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.hibi.example.com
+    steps:
+      - name: Run prisma migrate deploy
+        run: |
+          echo "Prisma schema loaded from prisma/schema.prisma"
+          echo 'Datasource "db": PostgreSQL database "app" at "staging-db:5432"'
+          echo "12 migrations found in prisma/migrations"
+          echo "Applying migration \`20261127_issue_sla\`"
+          echo '::error::P3018 A migration failed to apply.'
+          echo '::error::Database error: column "sla_due" of relation "Issue" already exists'
+          exit 1
+      - name: Deploy
+        run: echo "never"
+
+  # Monorepo: three services.
+  api-staging:
+    name: deploy-api / staging
+    if: inputs.scenario == 'monorepo'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: api-staging, url: "https://api.staging.hibi.example.com" }
+    steps: [{ name: Deploy, run: "echo api; sleep 4" }]
+  web-staging:
+    name: deploy-web / staging
+    if: inputs.scenario == 'monorepo'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: web-staging, url: "https://staging.hibi.example.com" }
+    steps: [{ name: Deploy, run: "echo web; sleep 4" }]
+  web-production:
+    name: deploy-web / production
+    if: inputs.scenario == 'monorepo'
+    needs: web-staging
+    runs-on: ubuntu-latest
+    environment: { name: web-production, url: "https://hibi.example.com" }
+    steps: [{ name: Deploy, run: "echo web prod; sleep 4" }]
+  worker-staging:
+    name: deploy-worker / staging
+    if: inputs.scenario == 'monorepo'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: worker-staging }
+    steps: [{ name: Deploy, run: "echo worker; for i in $(seq 1 60); do echo tick $i; sleep 10; done" }]
+
+  # Regionen: eu and us done, ap still rolling out.
+  prod-eu:
+    name: rollout (eu)
+    if: inputs.scenario == 'regions'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: prod-eu, url: "https://eu.hibi.example.com" }
+    steps: [{ name: Rollout, run: "echo eu; sleep 4" }]
+  prod-us:
+    name: rollout (us)
+    if: inputs.scenario == 'regions'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: prod-us, url: "https://us.hibi.example.com" }
+    steps: [{ name: Rollout, run: "echo us; sleep 6" }]
+  prod-ap:
+    name: rollout (ap)
+    if: inputs.scenario == 'regions'
+    needs: e2e
+    runs-on: ubuntu-latest
+    environment: { name: prod-ap, url: "https://ap.hibi.example.com" }
+    steps: [{ name: Rollout, run: "echo ap; for i in $(seq 1 60); do echo waiting for rollout $i/60; sleep 10; done" }]
+
+  # Previews: two at once.
+  pr-41:
+    name: preview (pr-41)
+    if: inputs.scenario == 'previews'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: pr-41, url: "https://pr-41.preview.hibi.example.com" }
+    steps: [{ name: Deploy preview, run: "echo pr-41; sleep 3" }]
+  pr-42:
+    name: preview (pr-42)
+    if: inputs.scenario == 'previews'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: pr-42, url: "https://pr-42.preview.hibi.example.com" }
+    steps: [{ name: Deploy preview, run: "echo pr-42; sleep 3" }]
