@@ -1,0 +1,35 @@
+name: Seed Testdaten
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Umgebung, in die geseedet wird
+        type: environment
+        required: true
+      scenario:
+        type: choice
+        options: [empty, checkout, big-board]
+        default: checkout
+      ticket:
+        description: Issue, für das geseedet wird
+        type: string
+      note:
+        type: string
+      dry_run:
+        description: Nur anzeigen, nichts ändern
+        type: boolean
+        default: false
+jobs:
+  seed:
+    name: Seed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show inputs
+        run: |
+          echo "environment=${{ inputs.environment }}"
+          echo "scenario=${{ inputs.scenario }}"
+          echo "ticket=${{ inputs.ticket }}"
+          echo "note=${{ inputs.note }}"
+          echo "dry_run=${{ inputs.dry_run }}"
+      - name: Seed
+        run: echo "Seeding ${{ inputs.scenario }} into ${{ inputs.environment }}"; sleep 5; echo "✓ 42 issues created"

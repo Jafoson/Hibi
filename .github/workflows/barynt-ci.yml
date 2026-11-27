@@ -1,0 +1,14 @@
+name: CI
+on:
+  push:
+    branches-ignore: [main]
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test
+        run: |
+          echo "bun test v1.3"
+          if [[ "${{ github.ref_name }}" == mob-3-* ]]; then echo "✗ board drag > touch start (12ms)"; echo "::error::1 test failed"; exit 1; fi
+          echo "✓ 128 passed"
